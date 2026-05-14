@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Invoices Month-End File Prep</title>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, Arial, sans-serif;
+      background: #eaecf0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 40px 44px;
+      width: 100%;
+      max-width: 640px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #1a2340;
+      letter-spacing: -0.3px;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: #7a8499;
+      margin-bottom: 28px;
+    }
+
+    .section-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #9aa3b5;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+      margin-top: 22px;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed #b8c0d4;
+      border-radius: 12px;
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: #f6f7fa;
+      position: relative;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: #7b8fc4;
+      background: #f0f2f8;
+    }
+    .drop-zone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .drop-icon { margin-bottom: 12px; display: flex; align-items: center; justify-content: center; }
+    .drop-icon svg { width: 32px; height: 32px; stroke: #8a96bb; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    .drop-text { color: #4a5068; font-size: 0.9rem; line-height: 1.6; }
+    .drop-text strong { color: #1a2340; }
+    .drop-text a { color: #5b74c2; font-weight: 600; text-decoration: underline; cursor: pointer; }
+    .drop-sub { font-size: 0.76rem; color: #9aa3b5; margin-top: 3px; }
+
+    /* File list */
+    .file-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+    .file-item {
+      display: flex; align-items: center; gap: 8px;
+      background: #f6f7fa; border: 1px solid #e2e5ed;
+      border-radius: 8px; padding: 8px 12px;
+      font-size: 0.82rem; color: #3a4260;
+    }
+    .file-item svg { width: 15px; height: 15px; stroke: #7b8fc4; fill: none; stroke-width: 1.8; flex-shrink: 0; }
+    .file-item .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-item .remove-btn {
+      background: none; border: none; cursor: pointer;
+      color: #b8c0d4; font-size: 1rem; line-height: 1;
+      padding: 2px 4px; border-radius: 4px; transition: color 0.15s;
+    }
+    .file-item .remove-btn:hover { color: #d94f4f; }
+
+    /* Custom Date Picker */
+    .date-wrapper { position: relative; }
+    .date-display {
+      width: 100%;
+      background: #ffffff;
+      border: 1px solid #d0d5e3;
+      border-radius: 8px;
+      color: #1a2340;
+      font-size: 0.9rem;
+      padding: 10px 38px 10px 14px;
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      position: relative;
+    }
+    .date-display.placeholder { color: #b8c0d4; }
+    .date-display:hover { border-color: #7b8fc4; }
+    .date-display.open { border-color: #7b8fc4; box-shadow: 0 0 0 3px rgba(123,143,196,0.15); }
+    .date-display .cal-icon {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      pointer-events: none; display: flex;
+    }
+    .date-display .cal-icon svg { width: 16px; height: 16px; stroke: #9aa3b5; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+    .cal-popup {
+      position: absolute; top: calc(100% + 6px); left: 0;
+      background: #ffffff; border: 1px solid #e2e5ed;
+      border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+      padding: 16px; width: 300px; z-index: 100; display: none;
+    }
+    .cal-popup.open { display: block; }
+    .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .cal-nav {
+      background: none; border: none; cursor: pointer;
+      color: #5b74c2; padding: 4px 8px; border-radius: 6px;
+      transition: background 0.15s; display: flex; align-items: center;
+    }
+    .cal-nav:hover { background: #f0f2f8; }
+    .cal-nav svg { width: 16px; height: 16px; stroke: #5b74c2; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .cal-month-year { display: flex; align-items: center; gap: 6px; }
+    .cal-select {
+      background: #f6f7fa; border: 1px solid #e2e5ed; border-radius: 6px;
+      color: #1a2340; font-size: 0.88rem; font-weight: 600;
+      padding: 4px 6px; cursor: pointer; font-family: inherit; outline: none;
+    }
+    .cal-select:focus { border-color: #7b8fc4; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+    .cal-dow { text-align: center; font-size: 0.7rem; font-weight: 600; color: #9aa3b5; padding: 4px 0 8px; }
+    .cal-day {
+      text-align: center; font-size: 0.82rem; color: #1a2340;
+      padding: 7px 4px; border-radius: 50%; cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    }
+    .cal-day:hover:not(.empty):not(.selected) { background: #f0f2f8; }
+    .cal-day.empty { cursor: default; }
+    .cal-day.selected { background: #1F4E79; color: #ffffff; font-weight: 700; }
+    .cal-day.today:not(.selected) { color: #5b74c2; font-weight: 700; }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: 10px; margin-top: 26px; }
+    .btn {
+      padding: 11px 20px; border-radius: 8px;
+      font-size: 0.88rem; font-weight: 600; cursor: pointer; border: none;
+      transition: all 0.18s; display: flex; align-items: center; justify-content: center; gap: 7px;
+      font-family: inherit;
+    }
+    .btn-primary { flex: 1; background: #1a2340; color: #ffffff; }
+    .btn-primary:hover:not(:disabled) { background: #242f54; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,35,64,0.2); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-clear { background: #ffffff; color: #7a8499; border: 1px solid #d0d5e3; flex: 0 0 auto; }
+    .btn-clear:hover { background: #f6f7fa; color: #4a5068; border-color: #b8c0d4; }
+
+    /* Status */
+    .status { margin-top: 16px; border-radius: 8px; padding: 12px 14px; font-size: 0.84rem; display: none; align-items: flex-start; gap: 10px; }
+    .status.show { display: flex; }
+    .status.processing { background: #f0f2f8; border: 1px solid #d0d5e3; color: #4a5580; }
+    .status.success { background: #f0faf4; border: 1px solid #b3dfc4; color: #2a7a4f; }
+    .status.error { background: #fef2f2; border: 1px solid #fdc5c5; color: #b94040; }
+    .spinner { width: 15px; height: 15px; min-width: 15px; border: 2px solid rgba(90,110,170,0.2); border-top-color: #7b8fc4; border-radius: 50%; animation: spin 0.7s linear infinite; margin-top: 1px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .status-text { line-height: 1.5; }
+
+    /* Progress bar */
+    .progress-wrap { margin-top: 10px; background: #e8eaf0; border-radius: 6px; height: 5px; overflow: hidden; display: none; }
+    .progress-wrap.show { display: block; }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, #1F4E79, #5b74c2); border-radius: 6px; width: 0%; transition: width 0.3s ease; }
+
+    /* Summary */
+    .summary-box { margin-top: 16px; display: none; }
+    .summary-box.show { display: block; }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .summary-item {
+      background: #f6f7fa; border: 1px solid #e2e5ed;
+      border-radius: 10px; padding: 12px 10px; text-align: center;
+    }
+    .s-label { font-size: 0.7rem; color: #9aa3b5; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+    .s-value { font-size: 1.3rem; font-weight: 700; color: #1a2340; }
+    .s-value.green { color: #2a7a4f; }
+    .s-value.blue  { color: #1F4E79; }
+
+    /* Download link */
+    .download-link {
+      display: none; margin-top: 14px; width: 100%;
+      padding: 11px 20px; border-radius: 8px;
+      background: #f0faf4; border: 1px solid #b3dfc4;
+      color: #2a7a4f; font-size: 0.88rem; font-weight: 600;
+      text-decoration: none; text-align: center;
+      align-items: center; justify-content: center; gap: 7px;
+      transition: background 0.15s;
+    }
+    .download-link:hover { background: #e0f5ea; }
+    .download-link svg { width: 15px; height: 15px; stroke: #2a7a4f; fill: none; stroke-width: 2; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Invoices Month-End File Prep</h1>
+  <p class="subtitle">Upload TicketVault invoices report export for month-end file prep</p>
+
+  <div class="section-label">Invoice Files</div>
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" multiple accept=".xlsx" />
+    <div class="drop-icon">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    </div>
+    <div class="drop-text">
+      <strong>Drop .xlsx files here</strong><br>
+      or <a id="browseLink">browse to upload</a>
+    </div>
+    <div class="drop-sub">Multiple files supported &mdash; duplicates skipped</div>
+  </div>
+  <div class="file-list" id="fileList"></div>
+
+  <div class="section-label">Month End Date</div>
+  <div class="date-wrapper" id="dateWrapper">
+    <div class="date-display placeholder" id="dateDisplay">
+      Select a date
+      <span class="cal-icon">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      </span>
+    </div>
+    <div class="cal-popup" id="calPopup">
+      <div class="cal-header">
+        <button class="cal-nav" id="calPrev">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="cal-month-year">
+          <select class="cal-select" id="calMonthSel"></select>
+          <select class="cal-select" id="calYearSel"></select>
+        </div>
+        <button class="cal-nav" id="calNext">
+          <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+      <div class="cal-grid" id="calGrid">
+        <div class="cal-dow">Su</div><div class="cal-dow">Mo</div><div class="cal-dow">Tu</div>
+        <div class="cal-dow">We</div><div class="cal-dow">Th</div><div class="cal-dow">Fr</div><div class="cal-dow">Sa</div>
+      </div>
+    </div>
+  </div>
+  <input type="hidden" id="monthEndDate" />
+
+  <div class="btn-row">
+    <button class="btn btn-primary" id="processBtn" disabled>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Process Files
+    </button>
+    <button class="btn btn-clear" id="clearBtn">Clear</button>
+  </div>
+
+  <div class="status" id="status">
+    <div class="spinner" id="statusSpinner" style="display:none"></div>
+    <div class="status-text" id="statusText"></div>
+  </div>
+
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+
+  <div class="summary-box" id="summaryBox">
+    <div class="summary-grid" id="summaryGrid"></div>
+  </div>
+
+  <a class="download-link" id="downloadLink" href="#" download>
+    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Download Again
+  </a>
+</div>
+
+<script>
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const CAL_ICON_HTML = `<span class="cal-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#9aa3b5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>`;
+
+  const today = new Date();
+  let calYear  = today.getFullYear();
+  let calMonth = today.getMonth();
+  let selectedDate = null;
+
+  const monthEndDate = document.getElementById('monthEndDate');
+  const dateDisplay  = document.getElementById('dateDisplay');
+  const calPopup     = document.getElementById('calPopup');
+  const calGrid      = document.getElementById('calGrid');
+  const calMonthSel  = document.getElementById('calMonthSel');
+  const calYearSel   = document.getElementById('calYearSel');
+
+  // Populate month/year selects
+  MONTHS.forEach((m, i) => {
+    const o = document.createElement('option'); o.value = i; o.textContent = m;
+    calMonthSel.appendChild(o);
+  });
+  for (let y = today.getFullYear() - 3; y <= today.getFullYear() + 2; y++) {
+    const o = document.createElement('option'); o.value = y; o.textContent = y;
+    calYearSel.appendChild(o);
+  }
+
+  function renderCal() {
+    calMonthSel.value = calMonth;
+    calYearSel.value  = calYear;
+    const days = calGrid.querySelectorAll('.cal-day');
+    days.forEach(d => d.remove());
+    const firstDay = new Date(calYear, calMonth, 1).getDay();
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+    for (let i = 0; i < firstDay; i++) {
+      const el = document.createElement('div'); el.className = 'cal-day empty'; calGrid.appendChild(el);
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const el = document.createElement('div');
+      el.className = 'cal-day'; el.textContent = d;
+      if (d === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear()) el.classList.add('today');
+      if (selectedDate && d === selectedDate.getDate() && calMonth === selectedDate.getMonth() && calYear === selectedDate.getFullYear()) el.classList.add('selected');
+      el.addEventListener('click', () => {
+        selectedDate = new Date(calYear, calMonth, d);
+        const fmt = `${calMonth + 1}-${d}-${calYear}`;
+        monthEndDate.value = fmt;
+        dateDisplay.innerHTML = `${MONTHS[calMonth]} ${d}, ${calYear} ${CAL_ICON_HTML}`;
+        dateDisplay.classList.remove('placeholder');
+        calPopup.classList.remove('open');
+        dateDisplay.classList.remove('open');
+        updateProcessBtn();
+      });
+      calGrid.appendChild(el);
+    }
+  }
+
+  dateDisplay.addEventListener('click', () => {
+    const isOpen = calPopup.classList.contains('open');
+    calPopup.classList.toggle('open', !isOpen);
+    dateDisplay.classList.toggle('open', !isOpen);
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#dateWrapper')) {
+      calPopup.classList.remove('open');
+      dateDisplay.classList.remove('open');
+    }
+  });
+  document.getElementById('calPrev').addEventListener('click', e => {
+    e.stopPropagation();
+    calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCal();
+  });
+  document.getElementById('calNext').addEventListener('click', e => {
+    e.stopPropagation();
+    calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCal();
+  });
+  calMonthSel.addEventListener('change', e => { e.stopPropagation(); calMonth = +e.target.value; renderCal(); });
+  calYearSel.addEventListener('change',  e => { e.stopPropagation(); calYear  = +e.target.value; renderCal(); });
+  renderCal();
+
+  // File handling
+  let selectedFiles = [];
+  let downloadUrl   = null;
+
+  const dropZone     = document.getElementById('dropZone');
+  const fileInput    = document.getElementById('fileInput');
+  const fileList     = document.getElementById('fileList');
+  const processBtn   = document.getElementById('processBtn');
+  const clearBtn     = document.getElementById('clearBtn');
+  const status       = document.getElementById('status');
+  const statusSpinner= document.getElementById('statusSpinner');
+  const statusText   = document.getElementById('statusText');
+  const progressWrap = document.getElementById('progressWrap');
+  const progressBar  = document.getElementById('progressBar');
+  const summaryBox   = document.getElementById('summaryBox');
+  const summaryGrid  = document.getElementById('summaryGrid');
+  const downloadLink = document.getElementById('downloadLink');
+
+  function updateProcessBtn() {
+    processBtn.disabled = selectedFiles.length === 0 || !monthEndDate.value.trim();
+  }
+
+  function renderFileList() {
+    fileList.innerHTML = '';
+    selectedFiles.forEach((f, i) => {
+      const item = document.createElement('div');
+      item.className = 'file-item';
+      item.innerHTML = `
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span class="file-name">${f.name}</span>
+        <button class="remove-btn" data-idx="${i}" title="Remove">&#x2715;</button>
+      `;
+      fileList.appendChild(item);
+    });
+    fileList.querySelectorAll('.remove-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedFiles.splice(+btn.dataset.idx, 1);
+        renderFileList(); updateProcessBtn();
+      });
+    });
+  }
+
+  function addFiles(newFiles) {
+    const existing = new Set(selectedFiles.map(f => f.name));
+    for (const f of newFiles) {
+      if (f.name.endsWith('.xlsx') && !existing.has(f.name)) { selectedFiles.push(f); existing.add(f.name); }
+    }
+    renderFileList(); updateProcessBtn();
+  }
+
+  fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+  document.getElementById('browseLink').addEventListener('click', e => { e.stopPropagation(); fileInput.click(); });
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); addFiles(e.dataTransfer.files); });
+
+  clearBtn.addEventListener('click', () => {
+    selectedFiles = []; fileInput.value = '';
+    selectedDate = null; calYear = today.getFullYear(); calMonth = today.getMonth();
+    monthEndDate.value = '';
+    dateDisplay.innerHTML = `Select a date ${CAL_ICON_HTML}`;
+    dateDisplay.classList.add('placeholder');
+    renderCal(); renderFileList(); updateProcessBtn();
+    status.className = 'status';
+    summaryBox.className = 'summary-box';
+    progressWrap.className = 'progress-wrap';
+    if (downloadUrl) { URL.revokeObjectURL(downloadUrl); downloadUrl = null; }
+    downloadLink.style.display = 'none'; downloadLink.href = '#';
+  });
+
+  function setStatus(type, text) {
+    status.className = `status show ${type}`;
+    statusSpinner.style.display = type === 'processing' ? 'block' : 'none';
+    statusText.innerHTML = text;
+  }
+
+  function animateProgress() {
+    let val = 0;
+    progressWrap.className = 'progress-wrap show';
+    progressBar.style.width = '0%';
+    const interval = setInterval(() => { val = Math.min(val + Math.random() * 8, 88); progressBar.style.width = val + '%'; }, 200);
+    return { complete: () => { clearInterval(interval); progressBar.style.width = '100%'; setTimeout(() => progressWrap.className = 'progress-wrap', 800); }};
+  }
+
+  processBtn.addEventListener('click', async () => {
+    const dateVal = monthEndDate.value.trim();
+    if (!selectedFiles.length || !dateVal) return;
+
+    const formData = new FormData();
+    formData.append('month_end_date', dateVal);
+    selectedFiles.forEach(f => formData.append('files', f));
+
+    processBtn.disabled = true;
+    setStatus('processing', `Processing ${selectedFiles.length} file(s)&#8230;`);
+    summaryBox.className = 'summary-box';
+    downloadLink.style.display = 'none';
+
+    const prog = animateProgress();
+
+    try {
+      const resp = await fetch('/process', { method: 'POST', body: formData });
+      if (!resp.ok) {
+        prog.complete();
+        const err = await resp.json();
+        setStatus('error', `&#10060; ${err.error || 'An error occurred.'}`);
+        processBtn.disabled = false; return;
+      }
+      const blob = await resp.blob();
+      prog.complete();
+      if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+      downloadUrl = URL.createObjectURL(blob);
+
+      const ysCount    = resp.headers.get('X-YS-Rows')    || '&mdash;';
+      const nonYsCount = resp.headers.get('X-NonYS-Rows') || '&mdash;';
+      const totalCount = resp.headers.get('X-Total-Rows') || '&mdash;';
+
+      setStatus('success', `&#9989; Successfully processed <strong>${selectedFiles.length} file(s)</strong> &mdash; export ready!`);
+
+      summaryBox.className = 'summary-box show';
+      summaryGrid.innerHTML = `
+        <div class="summary-item"><div class="s-label">Total Rows</div><div class="s-value blue">${totalCount}</div></div>
+        <div class="summary-item"><div class="s-label">Files Processed</div><div class="s-value blue">${selectedFiles.length}</div></div>
+        <div class="summary-item"><div class="s-label">Y&amp;S Rows</div><div class="s-value green">${ysCount}</div></div>
+        <div class="summary-item"><div class="s-label">Non Y&amp;S Rows</div><div class="s-value">${nonYsCount}</div></div>
+      `;
+
+      downloadLink.href = downloadUrl;
+      downloadLink.download = `Invoices ${dateVal}.zip`;
+      downloadLink.style.display = 'inline-flex';
+
+      const a = document.createElement('a');
+      a.href = downloadUrl; a.download = `Invoices ${dateVal}.zip`; a.click();
+
+    } catch (e) {
+      prog.complete();
+      setStatus('error', `&#10060; Network error: ${e.message}`);
+    }
+    processBtn.disabled = false; updateProcessBtn();
+  });
+</script>
+</body>
+</html>
